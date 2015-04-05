@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+2015.4.5
+-->
+<html>
+<head>
+    <title>signal</title>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-2.1.3.min.js"></script>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/pixi.js/2.2.8/pixi.js"></script>
+</head>
+<body>
+    <audio id="music" controls>
+        <source src="./Sign_v2.mp3" type="audio/mpeg"/>
+    </audio>
+    <canvas id="view" width="640" height="480"></canvas>
+    <script type="text/javascript">
+    // music
+    var audioContext = new AudioContext();
+    var source = audioContext.createMediaElementSource($('#music')[0]);
+    var lowpassFilter = audioContext.createBiquadFilter();
+    var analyser = audioContext.createAnalyser();
+    $('#music').on('canplay', function() {
+        source.connect(lowpassFilter);
+        // lowpass filter
+        lowpassFilter.type = 'lowpass';
+        lowpassFilter.Q.value = 30;
+        lowpassFilter.connect(analyser);
+        // analyser
+        analyser.fftSize = 64;
+        analyser.connect(audioContext.destination);
+        window.requestAnimationFrame(draw);
+    });
+    function setLowpass(value) {
+        var min = 40;
+        var max = audioContext.sampleRate / 2;
+        var numberOfOctaves = Math.log(max / min) / Math.LN2;
+        var multiplier = Math.pow(
+            2, numberOfOctaves * (value - 1));
+        lowpassFilter.frequency.value = max * multiplier;
+    }
+    // view
+    var sw = 640;
+    var sh = 480;
+    var renderer = new PIXI.WebGLRenderer(sw, sh, {
+        view: $('#view')[0],
+        resolution: 1 }
+    );
+    var stage = new PIXI.Stage;
+    var signalGraphics = new PIXI.Graphics();
+    stage.addChild(signalGraphics);
+    function drawSignal(signalData) {
+        with (signalGraphics) {
+            clear();
+            lineStyle(5, 0xabcdef);
+            moveTo(0, sh * 0.5);
+            for (var i = 0; i < signalData.length; ++i) {
+                lineTo((i / signalData.length) * sw, sh * 0.5 + signalData[i]);
+            }
+        }
+    }
+    function draw(timestamp) {
+        window.requestAnimationFrame(draw);
+        var frequencyData = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(frequencyData);
+        setLowpass((Math.sin((timestamp) * 0.001) + 1) * 0.5);
+        drawSignal(frequencyData);
+        renderer.render(stage);
+    }
+    </script>
+</body>
+</html>
